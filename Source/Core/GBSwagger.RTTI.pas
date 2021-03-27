@@ -65,6 +65,7 @@ type
 
       function IsSwaggerArray: Boolean;
       function IsSwaggerIgnore(AClass: TClass): Boolean;
+      function IsSwaggerReadOnly: Boolean;
 
       function ArrayType: string;
       function ListType : string;
@@ -88,12 +89,17 @@ type
       function GetSwagEndPoint    : SwagEndPoint;
       function GetSwagParamPath   : TArray<SwagParamPath>;
       function GetSwagParamHeader : TArray<SwagParamHeader>;
+      function GetSwagConsumes    : TArray<String>;
+      function GetSwagProduces    : TArray<String>;
       function GetSwagParamQuery  : TArray<SwagParamQuery>;
       function GetSwagParamBody   : SwagParamBody;
       function GetSwagResponse    : TArray<SwagResponse>;
   end;
 
   TGBSwaggerObjectHelper = class helper for TObject
+    private
+      class function GetAttributes: TArray<TCustomAttribute>; overload;
+      class function GetAttributes<T: TCustomAttribute>: TArray<T>; overload;
     public
       function invokeMethod(const MethodName: string; const Parameters: array of TValue): TValue;
 
@@ -105,6 +111,10 @@ type
       class function GetAttribute<T: TCustomAttribute>: T;
       class function GetSwagClass: SwagClass;
       class function GetSwagPath : SwagPath;
+
+      class function GetSwagParamPaths: TArray<SwagParamPath>;
+      class function GetSwagParamHeaders: TArray<SwagParamHeader>;
+      class function GetSwagParamQueries: TArray<SwagParamQuery>;
 
       class function SwagDescription(ASwagger: IGBSwagger): string;
       class function SwaggerRequiredFields: TArray<String>;
@@ -335,6 +345,15 @@ begin
 
   if Self.PropertyType.ToString.ToLower.StartsWith('tlist<') then
     Exit(True);
+
+  if Assigned(Self.PropertyType.BaseType) then
+  begin
+    if Self.PropertyType.BaseType.Name.ToLower.StartsWith('tobjectlist<') then
+      Exit(True);
+
+    if Self.PropertyType.BaseType.Name.ToLower.StartsWith('tlist<') then
+      Exit(True);
+  end;
 end;
 
 function TGBSwaggerRTTIPropertyHelper.IsNullable: Boolean;
@@ -387,14 +406,32 @@ begin
   end;
 end;
 
+function TGBSwaggerRTTIPropertyHelper.IsSwaggerReadOnly: Boolean;
+var
+  swaggerProp: SwagProp;
+begin
+  result := False;
+  swaggerProp := GetAttribute<SwagProp>;
+  if (Assigned(swaggerProp)) and (swaggerProp.readOnly) then
+    result := True;
+end;
+
 function TGBSwaggerRTTIPropertyHelper.ListType: string;
+var
+  baseType: string;
 begin
   result := EmptyStr;
   if IsList then
   begin
+    if Assigned(PropertyType.BaseType) then
+    begin
+      baseType := PropertyType.Name;
+      baseType := Copy(baseType, 1, Pos('<', baseType));
+    end;
     Result := PropertyType.ToString
                 .Replace('TObjectList<', EmptyStr)
                 .Replace('TList<', EmptyStr)
+                .Replace(baseType, EmptyStr)
                 .Replace('>', EmptyStr);
   end;
 end;
@@ -515,6 +552,31 @@ begin
       Exit(T( rType.GetAttributes[i]));
 end;
 
+class function TGBSwaggerObjectHelper.GetAttributes: TArray<TCustomAttribute>;
+var
+  rType: TRttiType;
+begin
+  result := nil;
+  rType  := TGBSwaggerRTTI.GetInstance.GetType(Self);
+  result := rType.GetAttributes;
+end;
+
+class function TGBSwaggerObjectHelper.GetAttributes<T>: TArray<T>;
+var
+  i : Integer;
+  attr: TArray<TCustomAttribute>;
+begin
+  attr := Self.GetAttributes;
+  for i := 0 to Pred(Length(attr)) do
+  begin
+    if attr[i].ClassNameIs(T.className) then
+    begin
+      SetLength(Result, Length(result) + 1);
+      result[Length(result) - 1] := T( attr[i] );
+    end;
+  end;
+end;
+
 class function TGBSwaggerObjectHelper.GetMethods: TArray<TRttiMethod>;
 begin
   result := TGBSwaggerRTTI.GetInstance.GetType(Self).GetMethods;
@@ -566,6 +628,21 @@ end;
 class function TGBSwaggerObjectHelper.GetSwagClass: SwagClass;
 begin
   Result := GetAttribute<SwagClass>;
+end;
+
+class function TGBSwaggerObjectHelper.GetSwagParamHeaders: TArray<SwagParamHeader>;
+begin
+  result := Self.GetAttributes<SwagParamHeader>;
+end;
+
+class function TGBSwaggerObjectHelper.GetSwagParamPaths: TArray<SwagParamPath>;
+begin
+  result := Self.GetAttributes<SwagParamPath>;
+end;
+
+class function TGBSwaggerObjectHelper.GetSwagParamQueries: TArray<SwagParamQuery>;
+begin
+  result := Self.GetAttributes<SwagParamQuery>;
 end;
 
 class function TGBSwaggerObjectHelper.GetSwagPath: SwagPath;
@@ -642,7 +719,7 @@ begin
     end;
 
     swaggerProp := rProp.GetAttribute<SwagProp>;
-    if (Assigned(swaggerProp)) then
+    if (Assigned(swaggerProp)) and (swaggerProp.required) then
     begin
       SetLength(result, Length(result) + 1);
       result[Length(result) - 1] := rProp.SwagName;
@@ -652,6 +729,40 @@ begin
 end;
 
 { TGBSwaggerMethodHelper }
+
+function TGBSwaggerMethodHelper.GetSwagProduces: TArray<String>;
+var
+  swaggerProduces: SwagProduces;
+  i : Integer;
+begin
+  result := [];
+  for i := 0 to Pred(Length(GetAttributes)) do
+  begin
+    if GetAttributes[i].ClassNameIs(SwagProduces.ClassName) then
+    begin
+      swaggerProduces := SwagProduces(GetAttributes[i]);
+      SetLength(Result, Length(result) + 1);
+      result[Length(result) - 1] := swaggerProduces.Accept;
+    end;
+  end;
+end;
+
+function TGBSwaggerMethodHelper.GetSwagConsumes: TArray<String>;
+var
+  swaggerConsumes: SwagConsumes;
+  i : Integer;
+begin
+  result := [];
+  for i := 0 to Pred(Length(GetAttributes)) do
+  begin
+    if GetAttributes[i].ClassNameIs(SwagConsumes.ClassName) then
+    begin
+      swaggerConsumes := SwagConsumes(GetAttributes[i]);
+      SetLength(Result, Length(result) + 1);
+      result[Length(result) - 1] := swaggerConsumes.ContentType;
+    end;
+  end;
+end;
 
 function TGBSwaggerMethodHelper.GetSwagEndPoint: SwagEndPoint;
 var

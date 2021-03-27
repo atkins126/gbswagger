@@ -135,7 +135,19 @@ type
                        bRequired: Boolean = True); overload;
 
     constructor create(AName: string;
+                       ASchema: String;
+                       ADescription: string;
+                       bIsArray: Boolean = False;
+                       bRequired: Boolean = True); overload;
+
+    constructor create(AName: string;
                        AClassType: TClass;
+                       bIsArray: Boolean = False;
+                       ADescription: string = '';
+                       bRequired: Boolean = True); overload;
+
+    constructor create(AName: string;
+                       ASchema: String;
                        bIsArray: Boolean = False;
                        ADescription: string = '';
                        bRequired: Boolean = True); overload;
@@ -157,6 +169,26 @@ type
     constructor create(APath: String; ASummary: String; APublic: Boolean = False; ADescription: String = ''); overload;
   end;
 
+  SwagConsumes = class(TCustomAttribute)
+  private
+    FContentType: String;
+  public
+    constructor create(Value: TGBSwaggerContentType); overload;
+    constructor create(Value: String); overload;
+
+    property ContentType: String read FContentType;
+  end;
+
+  SwagProduces = class(TCustomAttribute)
+  private
+    FAccept: String;
+  public
+    constructor create(Value: TGBSwaggerContentType); overload;
+    constructor create(Value: String); overload;
+
+    property Accept: String read FAccept;
+  end;
+
   SwagGET = class(SwagEndPoint)
   end;
 
@@ -167,6 +199,9 @@ type
   end;
 
   SwagDELETE = class(SwagEndPoint)
+  end;
+
+  SwagPATCH = class(SwagEndPoint)
   end;
 
   SwagResponse = class(TCustomAttribute)
@@ -279,6 +314,24 @@ end;
 constructor SwagParamBody.create(AName: string; AClassType: TClass; ADescription: string; bIsArray, bRequired: Boolean);
 begin
   create(AName, AClassType, bIsArray, ADescription, bRequired);
+end;
+
+constructor SwagParamBody.create(AName, ASchema: String; bIsArray: Boolean; ADescription: string; bRequired: Boolean);
+begin
+  Fname        := AName;
+  FSchema      := ASchema;
+  FisArray     := bIsArray;
+  Fdescription := ADescription;
+  Frequired    := bRequired;
+end;
+
+constructor SwagParamBody.create(AName, ASchema, ADescription: string; bIsArray, bRequired: Boolean);
+begin
+  Fname        := AName;
+  FSchema      := ASchema;
+  FisArray     := bIsArray;
+  Fdescription := ADescription;
+  Frequired    := bRequired;
 end;
 
 { SwagResponse }
@@ -441,6 +494,30 @@ begin
   Fname := AName;
   Femail:= AEmail;
   Fsite := ASite;
+end;
+
+{ SwagContentType }
+
+constructor SwagConsumes.create(Value: String);
+begin
+  FContentType := Value;
+end;
+
+constructor SwagConsumes.create(Value: TGBSwaggerContentType);
+begin
+  FContentType := Value.toString;
+end;
+
+{ SwagAccept }
+
+constructor SwagProduces.create(Value: String);
+begin
+  FAccept := Value;
+end;
+
+constructor SwagProduces.create(Value: TGBSwaggerContentType);
+begin
+  FAccept := Value.toString;
 end;
 
 end.

@@ -55,13 +55,23 @@ end;
 function TGBSwaggerModelJSONSchema.JSONProperties: TJSONObject;
 var
   rttiProperty: TRttiProperty;
+  pair: TJSONPair;
 begin
   result := TJSONObject.Create;
   for rttiProperty in FSchema.ClassType.GetProperties do
   begin
     if not rttiProperty.IsSwaggerIgnore(FSchema.ClassType) then
-      Result.AddPair(rttiProperty.SwagName, JSONProperty(rttiProperty))
+      if Result.Get(rttiProperty.SwagName) = nil then
+        Result.AddPair(rttiProperty.SwagName, JSONProperty(rttiProperty))
   end;
+
+  // Excluir Swagger Ignore em caso de herança
+  for rttiProperty in FSchema.ClassType.GetProperties do
+    if rttiProperty.IsSwaggerIgnore(FSchema.ClassType) then
+    begin
+      pair := Result.RemovePair(rttiProperty.SwagName);
+      pair.Free;
+    end;
 end;
 
 function TGBSwaggerModelJSONSchema.JSONProperty(AProperty: TRttiProperty): TJSONObject;
@@ -73,6 +83,9 @@ begin
               .AddPair('description', AProperty.SwagDescription)
               .AddPair('minLength', TJSONNumber.Create(AProperty.SwagMinLength))
               .AddPair('maxLength', TJSONNumber.Create(AProperty.SwagMaxLength));
+
+  if AProperty.IsSwaggerReadOnly then
+    Result.AddPair('readOnly', TJSONBool.Create(True));
 
   if (AProperty.IsInteger) or (AProperty.IsFloat) then
   begin
@@ -156,11 +169,17 @@ function TGBSwaggerModelJSONSchema.JSONPropertyPairObject(AProperty: TRttiProper
 var
   classType: TClass;
   className: string;
+  jsonArray: TJSONArray;
 begin
   classType := AProperty.GetClassType;
   className := FSchema.&End.SchemaName(classType);
 
-  Result := TJSONPair.Create('$ref', '#/definitions/' + className);
+  jsonArray := TJSONArray.Create;
+  jsonArray.AddElement(TJsonObject.Create
+                          .AddPair('$ref', '#/definitions/' + className));
+
+  Result := TJSONPair.Create('allOf', jsonArray);
+//  Result := TJSONPair.Create('$ref', '#/definitions/' + className);
 end;
 
 function TGBSwaggerModelJSONSchema.JSONRequired: TJSONArray;

@@ -3,6 +3,9 @@ unit GBSwagger.Model.Types;
 interface
 
 uses
+  {$IFNDEF DSNAP}
+  Horse,
+  {$ENDIF}
   System.SysUtils,
   Web.HTTPApp;
 
@@ -11,7 +14,9 @@ const
   SWAG_INTEGER = 'integer';
 
 type
-  TGBSwaggerContentType = (gbAppJSON, gbAppXML, gbTextHtml, gbPlainText, gbMultiPartFormData);
+  TRouteCallback = {$IFNDEF HORSE} Horse.THorseCallback {$ELSE} TObject {$ENDIF};
+
+  TGBSwaggerContentType = (gbAppJSON, gbAppXML, gbTextHtml, gbPlainText, gbMultiPartFormData, gbAppOctetStream);
   TGBSwaggerProtocol    = (gbHttp, gbHttps);
   TGBSwaggerParamType   = (gbHeader, gbBody, gbQuery, gbPath, gbFormData);
   TGBSwaggerSecurityType = (gbBasic, gbApiKey, gbOAuth2);
@@ -137,6 +142,7 @@ begin
   case Self of
     gbAppJSON           : result := 'application/json';
     gbAppXML            : result := 'application/xml';
+    gbAppOctetStream    : result := 'application/octet-stream';
     gbTextHtml          : result := 'text/html';
     gbPlainText         : result := 'text/plain';
     gbMultiPartFormData : result := 'multipart/form-data';

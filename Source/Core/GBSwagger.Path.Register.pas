@@ -33,9 +33,11 @@ type
     class procedure RegisterMethods(AClass: TClass; APath: SwagPath);
     class procedure RegisterMethod (AClass: TClass; AMethod: TRttiMethod);
 
-    class procedure RegisterMethodHeaders  (AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
-    class procedure RegisterMethodPaths    (AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
-    class procedure RegisterMethodQueries  (AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
+    class procedure RegisterMethodHeaders  (AClass: TClass; AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
+    class procedure RegisterMethodPaths    (AClass: TClass; AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
+    class procedure RegisterMethodQueries  (AClass: TClass; AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
+    class procedure RegisterConsumes       (AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
+    class procedure RegisterProduces       (AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
     class procedure RegisterMethodBody     (AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
     class procedure RegisterMethodResponse (AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
 
@@ -58,7 +60,8 @@ var
 begin
   pathAttr := AClass.GetSwagPath;
   endpoint := AMethod.GetSwagEndPoint;
-  pathName := IfThen(pathAttr.name.IsEmpty, AClass.ClassName, pathAttr.name);
+//  pathName := IfThen(pathAttr.name.IsEmpty, AClass.ClassName, pathAttr.name);
+  pathName := pathAttr.name;
   path     := (pathName + '/' + endpoint.path).Replace('//', '/');
 
   if path.EndsWith('/') then
@@ -77,6 +80,9 @@ begin
   if endpoint is SwagDELETE then
     Result := swaggerPath.DELETE
   else
+  if endpoint is SwagPATCH then
+    Result := swaggerPath.PATCH
+  else
     raise ENotImplemented.CreateFmt('Verbo http não implementado.', []);
 
   Result
@@ -85,15 +91,37 @@ begin
     .IsPublic(endpoint.isPublic);
 end;
 
+class procedure TGBSwaggerPathRegister.RegisterProduces(AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
+var
+  i : Integer;
+  accept: TArray<String>;
+begin
+  accept := AMethod.GetSwagProduces;
+  for i := 0 to Pred(Length(accept)) do
+    APathMethod.AddProduces(accept[i]);
+end;
+
+class procedure TGBSwaggerPathRegister.RegisterConsumes(AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
+var
+  i : Integer;
+  contentType: TArray<String>;
+begin
+  contentType := AMethod.GetSwagConsumes;
+  for i := 0 to Pred(Length(contentType)) do
+    APathMethod.AddConsumes(contentType[i]);
+end;
+
 class procedure TGBSwaggerPathRegister.RegisterMethod(AClass: TClass; AMethod: TRttiMethod);
 var
   pathMethod: IGBSwaggerPathMethod;
 begin
   pathMethod := GetSwaggerMethod(AClass, AMethod);
 
-  RegisterMethodHeaders  (AMethod, pathMethod);
-  RegisterMethodPaths    (AMethod, pathMethod);
-  RegisterMethodQueries  (AMethod, pathMethod);
+  RegisterMethodHeaders  (AClass, AMethod, pathMethod);
+  RegisterMethodPaths    (AClass, AMethod, pathMethod);
+  RegisterMethodQueries  (AClass, AMethod, pathMethod);
+  RegisterConsumes       (AMethod, pathMethod);
+  RegisterProduces       (AMethod, pathMethod);
   RegisterMethodBody     (AMethod, pathMethod);
   RegisterMethodResponse (AMethod, pathMethod);
 end;
@@ -119,12 +147,21 @@ begin
   end;
 end;
 
-class procedure TGBSwaggerPathRegister.RegisterMethodHeaders(AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
+class procedure TGBSwaggerPathRegister.RegisterMethodHeaders(AClass: TClass; AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
 var
   i      : Integer;
   params : TArray<SwagParamHeader>;
+  classParams : TArray<SwagParamHeader>;
 begin
+  classParams := AClass.GetSwagParamHeaders;
   params := AMethod.GetSwagParamHeader;
+
+  for i := 0 to Pred(Length(classParams)) do
+  begin
+    SetLength(params, Length(params) + 1);
+    params[Length(params) - 1] := classParams[i];
+  end;
+
   for i := 0 to Pred(Length(params)) do
   begin
     APathMethod
@@ -135,12 +172,21 @@ begin
   end;
 end;
 
-class procedure TGBSwaggerPathRegister.RegisterMethodPaths(AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
+class procedure TGBSwaggerPathRegister.RegisterMethodPaths(AClass: TClass; AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
 var
-  i      : Integer;
-  params : TArray<SwagParamPath>;
+  i           : Integer;
+  params      : TArray<SwagParamPath>;
+  classParams : TArray<SwagParamPath>;
 begin
+  classParams := AClass.GetSwagParamPaths;
   params := AMethod.GetSwagParamPath;
+
+  for i := 0 to Pred(Length(classParams)) do
+  begin
+    SetLength(params, Length(params) + 1);
+    params[Length(params) - 1] := classParams[i];
+  end;
+
   for i := 0 to Pred(Length(params)) do
   begin
     APathMethod
@@ -151,12 +197,21 @@ begin
   end;
 end;
 
-class procedure TGBSwaggerPathRegister.RegisterMethodQueries(AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
+class procedure TGBSwaggerPathRegister.RegisterMethodQueries(AClass: TClass; AMethod: TRttiMethod; APathMethod: IGBSwaggerPathMethod);
 var
-  i      : Integer;
-  params : TArray<SwagParamQuery>;
+  i           : Integer;
+  params      : TArray<SwagParamQuery>;
+  classParams : TArray<SwagParamQuery>;
 begin
+  classParams := AClass.GetSwagParamQueries;
   params := AMethod.GetSwagParamQuery;
+
+  for i := 0 to Pred(Length(classParams)) do
+  begin
+    SetLength(params, Length(params) + 1);
+    params[Length(params) - 1] := classParams[i];
+  end;
+
   for i := 0 to Pred(Length(params)) do
   begin
     APathMethod
